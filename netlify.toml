@@ -1,0 +1,9 @@
+[[redirects]]
+  from = "/quote/*"
+  to = "/.netlify/functions/quote/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/fundamentals/*"
+  to = "/.netlify/functions/fundamentals/:splat"
+  status = 200

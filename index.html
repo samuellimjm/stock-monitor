@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>US Market Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0a0b0d;
+    --surface: #111317;
+    --surface2: #181b20;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #e8e9eb;
+    --text2: #8a8f9a;
+    --text3: #555b66;
+    --green: #1db97a;
+    --green-bg: rgba(29,185,122,0.1);
+    --red: #e8514a;
+    --red-bg: rgba(232,81,74,0.1);
+    --accent: #4f7ef8;
+    --accent-bg: rgba(79,126,248,0.1);
+    --font-display: 'Syne', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font-display); min-height: 100vh; }
+
+  .app { max-width: 1280px; margin: 0 auto; padding: 0 24px 60px; }
+  header { display: flex; align-items: flex-end; justify-content: space-between; padding: 32px 0 28px; border-bottom: 1px solid var(--border); margin-bottom: 32px; flex-wrap: wrap; gap: 16px; }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.4} }
+  .logo h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+  .logo span { color: var(--text2); font-weight: 400; }
+  .header-right { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  #timestamp { font-family: var(--font-mono); font-size: 12px; color: var(--text3); }
+  .btn { font-family: var(--font-display); font-size: 13px; font-weight: 500; padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border2); background: var(--surface2); color: var(--text); cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 7px; }
+  .btn:hover { background: var(--surface); border-color: rgba(255,255,255,0.2); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #3d6de8; border-color: #3d6de8; }
+
+  .tabs { display: flex; gap: 4px; margin-bottom: 28px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 4px; width: fit-content; }
+  .tab { font-size: 13px; font-weight: 500; padding: 7px 18px; border-radius: 7px; cursor: pointer; border: none; background: transparent; color: var(--text2); transition: all 0.15s; }
+  .tab.active { background: var(--surface2); color: var(--text); border: 1px solid var(--border2); }
+
+  .loading-state { text-align: center; padding: 80px 20px; }
+  .spinner { width: 32px; height: 32px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 16px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-state p { color: var(--text2); font-size: 14px; }
+  .loading-state small { color: var(--text3); font-size: 12px; font-family: var(--font-mono); }
+
+  .error-banner { background: var(--red-bg); border: 1px solid rgba(232,81,74,0.25); border-radius: 10px; padding: 16px 20px; color: var(--red); font-size: 13px; margin-bottom: 20px; display: none; line-height: 1.6; }
+  .error-banner code { font-family: var(--font-mono); font-size: 12px; opacity: 0.8; }
+
+  .stocks-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+
+  .stock-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px 22px; transition: border-color 0.2s; position: relative; overflow: hidden; }
+  .stock-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,transparent,var(--accent),transparent); opacity:0; transition:opacity 0.2s; }
+  .stock-card:hover { border-color: var(--border2); }
+  .stock-card:hover::before { opacity: 1; }
+
+  .card-top { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: flex-start; margin-bottom: 16px; }
+  .rank-badge { width:32px; height:32px; border-radius:8px; background:var(--surface2); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-family:var(--font-mono); font-size:12px; color:var(--text2); flex-shrink:0; }
+  .stock-identity .name { font-size:16px; font-weight:600; color:var(--text); letter-spacing:-0.01em; }
+  .stock-identity .meta { display:flex; align-items:center; gap:8px; margin-top:3px; flex-wrap:wrap; }
+  .ticker-badge { font-family:var(--font-mono); font-size:11px; background:var(--accent-bg); color:var(--accent); padding:2px 7px; border-radius:5px; border:1px solid rgba(79,126,248,0.2); }
+  .sector-badge { font-size:11px; color:var(--text3); }
+  .price-block { text-align:right; flex-shrink:0; }
+  .price-block .price { font-family:var(--font-mono); font-size:22px; font-weight:500; color:var(--text); }
+  .price-block .chg { font-family:var(--font-mono); font-size:12px; margin-top:3px; }
+  .up { color:var(--green); }
+  .dn { color:var(--red); }
+
+  .fundamentals { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:16px; padding:14px 16px; background:var(--surface2); border-radius:10px; border:1px solid var(--border); }
+  .fund-item .label { font-size:10px; color:var(--text3); font-family:var(--font-mono); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px; }
+  .fund-item .value { font-family:var(--font-mono); font-size:14px; font-weight:500; color:var(--text); }
+
+  .chart-row { margin-bottom:14px; }
+  .chart-label { font-size:11px; color:var(--text3); font-family:var(--font-mono); margin-bottom:6px; }
+  .chart-wrap { position:relative; height:72px; }
+
+  .trends { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
+  .trend-chip { font-family:var(--font-mono); font-size:11px; padding:4px 10px; border-radius:6px; border:1px solid var(--border); background:var(--surface2); color:var(--text2); display:flex; gap:5px; align-items:center; }
+  .trend-chip .period { color:var(--text3); }
+  .trend-chip.up { background:var(--green-bg); border-color:rgba(29,185,122,0.2); color:var(--green); }
+  .trend-chip.dn { background:var(--red-bg); border-color:rgba(232,81,74,0.2); color:var(--red); }
+  .trend-chip.up .period,.trend-chip.dn .period { color:inherit; opacity:0.6; }
+
+  .peers-toggle { font-size:12px; color:var(--text2); background:none; border:1px solid var(--border); border-radius:7px; padding:6px 12px; cursor:pointer; font-family:var(--font-display); transition:all 0.15s; display:flex; align-items:center; gap:6px; }
+  .peers-toggle:hover { border-color:var(--border2); color:var(--text); }
+  .peers-section { display:none; margin-top:14px; border-top:1px solid var(--border); padding-top:14px; }
+  .peers-section.open { display:block; }
+  .peers-title { font-size:11px; font-weight:600; color:var(--text3); font-family:var(--font-mono); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:10px; }
+  .peers-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .peers-table th { font-family:var(--font-mono); font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.06em; padding:5px 8px; text-align:right; font-weight:400; }
+  .peers-table th:first-child { text-align:left; }
+  .peers-table td { padding:7px 8px; font-family:var(--font-mono); font-size:12px; color:var(--text); border-top:1px solid var(--border); text-align:right; }
+  .peers-table td:first-child { text-align:left; color:var(--text2); }
+  .peers-table tr.base-row td { color:var(--accent); background:var(--accent-bg); }
+  .peers-spinner { text-align:center; padding:20px; color:var(--text3); font-size:12px; font-family:var(--font-mono); }
+
+  .analysis-card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:28px; }
+  .analysis-card h2 { font-size:15px; font-weight:600; margin-bottom:12px; display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+  .ai-badge { font-size:10px; font-family:var(--font-mono); background:var(--green-bg); color:var(--green); border:1px solid rgba(29,185,122,0.25); padding:2px 8px; border-radius:5px; letter-spacing:0.04em; }
+  .analysis-method-note { font-size:12px; color:var(--text3); font-family:var(--font-mono); line-height:1.6; margin-bottom:20px; padding:10px 14px; background:var(--surface2); border-radius:8px; border:1px solid var(--border); }
+  .disclaimer { font-size:11px; color:var(--text3); font-family:var(--font-mono); margin-top:20px; padding-top:16px; border-top:1px solid var(--border); line-height:1.6; }
+
+  .overview-block { background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:20px; }
+  .overview-label { font-size:10px; font-family:var(--font-mono); color:var(--text3); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:7px; }
+  .overview-text { font-size:13px; color:var(--text2); line-height:1.7; }
+  .overview-text strong { color:var(--text); }
+
+  .top-picks { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:24px; }
+  .pick-card { border-radius:10px; padding:14px 16px; border:1px solid var(--border); }
+  .pick-buy   { background:rgba(29,185,122,0.07); border-color:rgba(29,185,122,0.2); }
+  .pick-watch { background:rgba(240,180,41,0.07); border-color:rgba(240,180,41,0.2); }
+  .pick-avoid { background:rgba(232,81,74,0.07);  border-color:rgba(232,81,74,0.2); }
+  .pick-label { font-size:10px; font-family:var(--font-mono); color:var(--text3); text-transform:uppercase; letter-spacing:0.07em; margin-bottom:6px; }
+  .pick-name  { font-size:14px; font-weight:600; color:var(--text); margin-bottom:5px; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+  .pick-reason { font-size:12px; color:var(--text2); line-height:1.5; }
+
+  .scores-label { font-size:11px; font-family:var(--font-mono); color:var(--text3); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:12px; }
+  .scores-grid { display:grid; grid-template-columns:1fr; gap:10px; }
+
+  .score-card { background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:14px 16px; transition:border-color 0.15s; }
+  .score-card:hover { border-color:var(--verdict-color,var(--border2)); }
+  .score-card-top { display:grid; grid-template-columns:28px 1fr auto auto; gap:10px; align-items:center; margin-bottom:10px; }
+  .score-rank { font-family:var(--font-mono); font-size:11px; color:var(--text3); }
+  .score-identity { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .score-name { font-size:13px; font-weight:600; color:var(--text); }
+  .score-verdict { font-size:11px; font-weight:600; font-family:var(--font-mono); padding:3px 9px; border-radius:6px; border:1px solid; white-space:nowrap; }
+  .score-bar-wrap { display:flex; align-items:center; gap:8px; grid-column:1/-1; }
+  .score-bar-track { flex:1; height:4px; background:var(--border); border-radius:2px; overflow:hidden; }
+  .score-bar-fill { height:100%; border-radius:2px; transition:width 0.6s ease; }
+  .score-pct { font-family:var(--font-mono); font-size:11px; white-space:nowrap; min-width:42px; text-align:right; }
+  .score-reasons { list-style:none; display:flex; flex-direction:column; gap:4px; }
+  .score-reasons li { font-size:12px; font-family:var(--font-mono); line-height:1.5; padding-left:4px; }
+  .analysis-pro  { color:var(--green); }
+  .analysis-con  { color:var(--red); }
+  .analysis-flag { color:var(--gold); }
+
+  @media(max-width:640px) {
+    .top-picks { grid-template-columns:1fr; }
+    .score-card-top { grid-template-columns:28px 1fr auto; }
+    .score-verdict { display:none; }
+  }
+
+  .status-bar { display:flex; align-items:center; gap:10px; margin-bottom:22px; font-size:12px; color:var(--text3); font-family:var(--font-mono); }
+  .status-dot { width:7px; height:7px; border-radius:50%; background:var(--text3); flex-shrink:0; }
+  .status-dot.live { background:var(--green); box-shadow:0 0 8px var(--green); animation:pulse 2s infinite; }
+
+  @media(max-width:640px) {
+    .fundamentals { grid-template-columns:repeat(2,1fr); }
+    .card-top { grid-template-columns:auto 1fr; }
+    .price-block { grid-column:1/-1; display:flex; align-items:center; justify-content:space-between; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">
+      <div class="logo-dot"></div>
+      <h1>US Market <span>Monitor</span></h1>
+    </div>
+    <div class="header-right">
+      <span id="timestamp">—</span>
+      <button class="btn" id="refresh-btn" onclick="loadAll()">↻ Refresh</button>
+      <button class="btn btn-primary" id="analysis-btn" onclick="switchToAnalysis()" disabled>✦ Analysis</button>
+    </div>
+  </header>
+
+  <div class="error-banner" id="error-banner"></div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="setTab('overview',this)">Overview</button>
+    <button class="tab" onclick="setTab('analysis',this)">AI Analysis</button>
+  </div>
+
+  <div id="tab-overview">
+    <div class="status-bar">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">Connecting to market data…</span>
+    </div>
+    <div id="loading-state" class="loading-state">
+      <div class="spinner"></div>
+      <p id="loading-msg">Fetching live market data…</p>
+      <small id="loading-sub">Top 10 stocks by market capitalisation</small>
+    </div>
+    <div id="stocks-grid" class="stocks-grid" style="display:none;"></div>
+  </div>
+
+  <div id="tab-analysis" style="display:none;">
+    <div id="analysis-wrapper">
+      <div class="analysis-card">
+        <h2>✦ Quantitative Analysis <span class="ai-badge">100% Free · No API Key</span></h2>
+        <div class="analysis-body" style="color:var(--text2);font-size:14px;">Load market data first, then click "✦ Analysis".</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+// ── The proxy base is empty string = same domain (Netlify Functions via redirects)
+const PROXY_BASE = '';
+
+const TOP10 = [
+  { ticker:'AAPL',  name:'Apple',              sector:'Technology' },
+  { ticker:'NVDA',  name:'Nvidia',             sector:'Semiconductors' },
+  { ticker:'MSFT',  name:'Microsoft',          sector:'Technology' },
+  { ticker:'AMZN',  name:'Amazon',             sector:'Consumer / Cloud' },
+  { ticker:'GOOGL', name:'Alphabet',           sector:'Technology' },
+  { ticker:'META',  name:'Meta Platforms',     sector:'Technology' },
+  { ticker:'TSLA',  name:'Tesla',              sector:'Automotive / EV' },
+  { ticker:'BRK-B', name:'Berkshire Hathaway', sector:'Financials' },
+  { ticker:'AVGO',  name:'Broadcom',           sector:'Semiconductors' },
+  { ticker:'JPM',   name:'JPMorgan Chase',     sector:'Financials' },
+];
+
+const PEERS = {
+  'AAPL':  [{t:'MSFT',n:'Microsoft'},{t:'DELL',n:'Dell'},{t:'HPQ',n:'HP Inc'},{t:'SONY',n:'Sony'},{t:'GOOGL',n:'Alphabet'}],
+  'NVDA':  [{t:'AMD',n:'AMD'},{t:'INTC',n:'Intel'},{t:'QCOM',n:'Qualcomm'},{t:'MU',n:'Micron'},{t:'MRVL',n:'Marvell'}],
+  'MSFT':  [{t:'GOOGL',n:'Alphabet'},{t:'AMZN',n:'Amazon'},{t:'CRM',n:'Salesforce'},{t:'ORCL',n:'Oracle'},{t:'SAP',n:'SAP'}],
+  'AMZN':  [{t:'MSFT',n:'Microsoft'},{t:'GOOGL',n:'Alphabet'},{t:'SHOP',n:'Shopify'},{t:'WMT',n:'Walmart'},{t:'BABA',n:'Alibaba'}],
+  'GOOGL': [{t:'META',n:'Meta'},{t:'MSFT',n:'Microsoft'},{t:'SNAP',n:'Snap'},{t:'PINS',n:'Pinterest'},{t:'TTD',n:'Trade Desk'}],
+  'META':  [{t:'GOOGL',n:'Alphabet'},{t:'SNAP',n:'Snap'},{t:'PINS',n:'Pinterest'},{t:'RDDT',n:'Reddit'},{t:'SPOT',n:'Spotify'}],
+  'TSLA':  [{t:'F',n:'Ford'},{t:'GM',n:'GM'},{t:'RIVN',n:'Rivian'},{t:'NIO',n:'NIO'},{t:'LCID',n:'Lucid'}],
+  'BRK-B': [{t:'JPM',n:'JPMorgan'},{t:'BAC',n:'BofA'},{t:'WFC',n:'Wells Fargo'},{t:'GS',n:'Goldman'},{t:'MS',n:'Morgan Stanley'}],
+  'AVGO':  [{t:'NVDA',n:'Nvidia'},{t:'AMD',n:'AMD'},{t:'QCOM',n:'Qualcomm'},{t:'TXN',n:'Texas Instruments'},{t:'MRVL',n:'Marvell'}],
+  'JPM':   [{t:'BAC',n:'BofA'},{t:'WFC',n:'Wells Fargo'},{t:'C',n:'Citigroup'},{t:'GS',n:'Goldman'},{t:'MS',n:'Morgan Stanley'}],
+};
+
+let stockData = {}, charts = {}, allLoaded = false;
+
+const fmtPrice  = n => n != null ? '$' + Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+const fmtPct    = n => n != null ? (n>=0?'+':'') + Number(n).toFixed(2) + '%' : '—';
+const fmtPE     = n => n != null ? Number(n).toFixed(1) + 'x' : '—';
+const fmtEPS    = n => n != null ? '$' + Number(n).toFixed(2) : '—';
+const fmtCap    = n => { if(!n) return '—'; if(n>=1e12) return '$'+(n/1e12).toFixed(2)+'T'; if(n>=1e9) return '$'+(n/1e9).toFixed(1)+'B'; return '$'+n; };
+const periodDays = p => ({'1D':1,'1W':5,'1M':21,'3M':63,'6M':126,'1Y':252})[p] || 252;
+const calcChange = (c,d) => { if(!c||c.length<2) return null; const v=c.filter(x=>x!=null); const l=v[v.length-1],r=v[Math.max(0,v.length-1-d)]; return r?((l-r)/r)*100:null; };
+
+async function apiFetch(path) {
+  const r = await fetch(PROXY_BASE + path);
+  if (!r.ok) throw new Error(`HTTP ${r.status} on ${path}`);
+  return r.json();
+}
+
+async function loadStock(item) {
+  const [q, f] = await Promise.all([
+    apiFetch(`/quote/${encodeURIComponent(item.ticker)}`),
+    apiFetch(`/fundamentals/${encodeURIComponent(item.ticker)}`)
+  ]);
+  const closes = q.closes || [];
+  const price  = q.price, prev = q.prevClose;
+  const dayChg = price && prev ? ((price-prev)/prev)*100 : null;
+  const trends = {};
+  ['1D','1W','1M','3M','6M','1Y'].forEach(p => { trends[p] = calcChange(closes, periodDays(p)); });
+  const data = { price, dayChg, mktCap:f.mktCap, pe:f.pe, eps:f.eps, revenue:f.revenue, trends, closes, name:item.name, sector:item.sector };
+  stockData[item.ticker] = data;
+  return data;
+}
+
+function renderCard(item, data, idx) {
+  const { price, dayChg, mktCap, pe, eps, revenue, trends } = data;
+  const trendHTML = ['1D','1W','1M','3M','6M','1Y'].map(p => {
+    const v = trends[p], cls = v==null?'':v>=0?'up':'dn';
+    return `<span class="trend-chip ${cls}"><span class="period">${p}</span>${v!=null?fmtPct(v):'—'}</span>`;
+  }).join('');
+  const div = document.createElement('div');
+  div.className = 'stock-card'; div.id = 'card-'+item.ticker;
+  div.innerHTML = `
+    <div class="card-top">
+      <div class="rank-badge">${String(idx+1).padStart(2,'0')}</div>
+      <div class="stock-identity">
+        <div class="name">${item.name}</div>
+        <div class="meta"><span class="ticker-badge">${item.ticker}</span><span class="sector-badge">${item.sector}</span></div>
+      </div>
+      <div class="price-block">
+        <div class="price">${fmtPrice(price)}</div>
+        <div class="chg ${dayChg!=null&&dayChg>=0?'up':'dn'}">${fmtPct(dayChg)} today</div>
+      </div>
+    </div>
+    <div class="fundamentals">
+      <div class="fund-item"><div class="label">Market Cap</div><div class="value">${fmtCap(mktCap)}</div></div>
+      <div class="fund-item"><div class="label">PE Ratio</div><div class="value">${fmtPE(pe)}</div></div>
+      <div class="fund-item"><div class="label">EPS (TTM)</div><div class="value">${fmtEPS(eps)}</div></div>
+      <div class="fund-item"><div class="label">Revenue</div><div class="value">${fmtCap(revenue)}</div></div>
+    </div>
+    <div class="chart-row">
+      <div class="chart-label">1-year price trend</div>
+      <div class="chart-wrap"><canvas id="chart-${item.ticker}"></canvas></div>
+    </div>
+    <div class="trends">${trendHTML}</div>
+    <button class="peers-toggle" onclick="togglePeers('${item.ticker}',this)">⇄ Compare with industry peers</button>
+    <div class="peers-section" id="peers-${item.ticker}"><div class="peers-spinner">Loading peers…</div></div>`;
+  return div;
+}
+
+function drawChart(ticker, closes) {
+  const canvas = document.getElementById('chart-'+ticker);
+  if (!canvas || !closes) return;
+  const v = closes.filter(x=>x!=null).slice(-252);
+  if (v.length < 2) return;
+  const chg = ((v[v.length-1]-v[0])/v[0])*100;
+  const color = chg>=0?'#1db97a':'#e8514a', fill = chg>=0?'rgba(29,185,122,0.08)':'rgba(232,81,74,0.08)';
+  if (charts[ticker]) charts[ticker].destroy();
+  charts[ticker] = new Chart(canvas, {
+    type:'line', data:{ labels:v.map((_,i)=>i), datasets:[{data:v,borderColor:color,borderWidth:1.5,pointRadius:0,fill:true,backgroundColor:fill,tension:0.3}] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false},tooltip:{enabled:false}}, scales:{x:{display:false},y:{display:false}}, animation:{duration:600} }
+  });
+}
+
+async function togglePeers(ticker, btn) {
+  const section = document.getElementById('peers-'+ticker);
+  if (section.classList.contains('open')) { section.classList.remove('open'); btn.textContent='⇄ Compare with industry peers'; return; }
+  section.classList.add('open'); btn.textContent='↑ Hide peers';
+  if (section.dataset.loaded) return;
+  section.dataset.loaded='1';
+  const peers = PEERS[ticker]||[];
+  const results = await Promise.allSettled(peers.map(async p => {
+    const [q,f] = await Promise.all([apiFetch(`/quote/${p.t}`).catch(()=>({})), apiFetch(`/fundamentals/${p.t}`).catch(()=>({}))]);
+    const price=q.price, prev=q.prevClose, dayChg=price&&prev?((price-prev)/prev)*100:null;
+    return {...p,price,dayChg,pe:f.pe,eps:f.eps};
+  }));
+  const base = stockData[ticker];
+  let rows = `<tr class="base-row"><td>${ticker} <small style="opacity:.6">(this stock)</small></td><td>${fmtPrice(base?.price)}</td><td>${fmtEPS(base?.eps)}</td><td>${fmtPE(base?.pe)}</td><td>—</td></tr>`;
+  results.forEach(r => {
+    if (r.status!=='fulfilled') return;
+    const p=r.value;
+    rows += `<tr><td>${p.t} <small style="color:var(--text3)">${p.n}</small></td><td>${fmtPrice(p.price)}</td><td>${fmtEPS(p.eps)}</td><td>${fmtPE(p.pe)}</td><td class="${p.dayChg!=null&&p.dayChg>=0?'up':'dn'}">${fmtPct(p.dayChg)}</td></tr>`;
+  });
+  section.innerHTML = `<div class="peers-title">Industry peers — price · EPS · PE · today</div>
+    <table class="peers-table"><thead><tr><th>Company</th><th>Price</th><th>EPS</th><th>PE</th><th>Today</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+// ── Rule-based analysis engine (no API key required) ─────────────────────────
+
+function scoreStock(ticker, d) {
+  // Each criterion awards points 0-10. We track reasons for transparency.
+  let score = 0;
+  const pros = [], cons = [], flags = [];
+
+  // 1. PE Ratio — sector-aware benchmarks
+  const sectorPE = {
+    'Technology': 30, 'Semiconductors': 28, 'Consumer / Cloud': 35,
+    'Automotive / EV': 60, 'Financials': 14,
+  };
+  const peBench = sectorPE[d.sector] || 25;
+  if (d.pe != null) {
+    const peRatio = d.pe / peBench;
+    if (peRatio < 0.75)      { score += 10; pros.push(`PE of ${d.pe.toFixed(1)}x is well below the ~${peBench}x sector average — attractively valued`); }
+    else if (peRatio < 1.0)  { score += 7;  pros.push(`PE of ${d.pe.toFixed(1)}x is modestly below the ~${peBench}x sector average`); }
+    else if (peRatio < 1.25) { score += 4;  flags.push(`PE of ${d.pe.toFixed(1)}x is slightly above the ~${peBench}x sector average`); }
+    else if (peRatio < 1.75) { score += 2;  cons.push(`PE of ${d.pe.toFixed(1)}x is elevated vs the ~${peBench}x sector average — limited margin of safety`); }
+    else                     { score += 0;  cons.push(`PE of ${d.pe.toFixed(1)}x is significantly above the ~${peBench}x sector average — priced for perfection`); }
+  } else { flags.push('PE ratio unavailable'); }
+
+  // 2. EPS — positive earnings is a baseline requirement
+  if (d.eps != null) {
+    if (d.eps > 5)       { score += 8; pros.push(`Strong trailing EPS of ${fmtEPS(d.eps)}`); }
+    else if (d.eps > 1)  { score += 5; pros.push(`Positive EPS of ${fmtEPS(d.eps)}`); }
+    else if (d.eps > 0)  { score += 2; flags.push(`Thin EPS of ${fmtEPS(d.eps)} — watch for earnings growth`); }
+    else                 { score -= 3; cons.push(`Negative EPS of ${fmtEPS(d.eps)} — company not yet profitable`); }
+  } else { flags.push('EPS data unavailable'); }
+
+  // 3. Momentum — 1-month trend (short-term direction)
+  const m1 = d.trends['1M'];
+  if (m1 != null) {
+    if (m1 > 10)       { score += 8; pros.push(`Strong 1-month momentum: ${fmtPct(m1)}`); }
+    else if (m1 > 3)   { score += 6; pros.push(`Positive 1-month trend: ${fmtPct(m1)}`); }
+    else if (m1 > 0)   { score += 4; flags.push(`Slight 1-month gain: ${fmtPct(m1)}`); }
+    else if (m1 > -5)  { score += 2; flags.push(`Mild 1-month pullback: ${fmtPct(m1)} — may offer entry point`); }
+    else               { score += 1; cons.push(`Weak 1-month momentum: ${fmtPct(m1)}`); }
+  }
+
+  // 4. Medium-term trend — 3-month
+  const m3 = d.trends['3M'];
+  if (m3 != null) {
+    if (m3 > 15)      { score += 7; pros.push(`Strong 3-month uptrend: ${fmtPct(m3)}`); }
+    else if (m3 > 5)  { score += 5; pros.push(`Solid 3-month performance: ${fmtPct(m3)}`); }
+    else if (m3 > 0)  { score += 3; }
+    else if (m3 > -10){ score += 1; flags.push(`3-month decline of ${fmtPct(m3)}`); }
+    else              { score += 0; cons.push(`Significant 3-month decline: ${fmtPct(m3)}`); }
+  }
+
+  // 5. Annual trend — 1-year
+  const m1y = d.trends['1Y'];
+  if (m1y != null) {
+    if (m1y > 40)      { score += 7; pros.push(`Outstanding 1-year return: ${fmtPct(m1y)}`); }
+    else if (m1y > 15) { score += 5; pros.push(`Strong 1-year return: ${fmtPct(m1y)}`); }
+    else if (m1y > 0)  { score += 3; pros.push(`Positive 1-year return: ${fmtPct(m1y)}`); }
+    else               { score += 0; cons.push(`Negative 1-year return: ${fmtPct(m1y)}`); }
+  }
+
+  // 6. Today's move vs 6-month context (is a dip a buying opportunity?)
+  const today = d.dayChg, m6 = d.trends['6M'];
+  if (today != null && m6 != null) {
+    if (today < -2 && m6 > 10) { score += 4; pros.push(`Today's dip (${fmtPct(today)}) in an otherwise strong 6-month uptrend — potential buy-the-dip opportunity`); }
+    else if (today > 3 && m6 < 0) { flags.push(`Sharp single-day gain (${fmtPct(today)}) after weak 6-month period — check if move is sustainable`); }
+  }
+
+  // Cap score at 40 for normalisation
+  score = Math.min(Math.max(score, 0), 40);
+  const pct = Math.round((score / 40) * 100);
+
+  return { score, pct, pros, cons, flags };
+}
+
+function getVerdict(pct) {
+  if (pct >= 72) return { label: 'Strong Buy',   color: '#1db97a', bg: 'rgba(29,185,122,0.12)',  icon: '▲▲' };
+  if (pct >= 55) return { label: 'Buy',           color: '#5ecb95', bg: 'rgba(94,203,149,0.10)',  icon: '▲' };
+  if (pct >= 40) return { label: 'Hold / Watch',  color: '#f0b429', bg: 'rgba(240,180,41,0.10)',  icon: '◆' };
+  if (pct >= 25) return { label: 'Caution',       color: '#f08c4b', bg: 'rgba(240,140,75,0.10)',  icon: '▼' };
+  return              { label: 'Avoid',           color: '#e8514a', bg: 'rgba(232,81,74,0.12)',   icon: '▼▼' };
+}
+
+function runAnalysis() {
+  const wrapper = document.getElementById('analysis-wrapper');
+
+  // Score all stocks
+  const scored = TOP10.map(item => {
+    const d = stockData[item.ticker];
+    if (!d) return null;
+    const { score, pct, pros, cons, flags } = scoreStock(item.ticker, d);
+    const verdict = getVerdict(pct);
+    return { item, d, score, pct, pros, cons, flags, verdict };
+  }).filter(Boolean).sort((a, b) => b.score - a.score);
+
+  const top    = scored[0];
+  const second = scored[1];
+  const avoid  = scored[scored.length - 1];
+
+  // Market overview derived from data
+  const gainers  = scored.filter(s => (s.d.trends['1M'] || 0) > 0).length;
+  const avgPE    = scored.filter(s => s.d.pe).reduce((a,s) => a + s.d.pe, 0) / scored.filter(s=>s.d.pe).length;
+  const momentum = gainers >= 7 ? 'broadly bullish' : gainers >= 5 ? 'mixed' : 'cautious';
+
+  const overviewText = `${gainers} of 10 mega-cap stocks show positive 1-month momentum — the market is <strong>${momentum}</strong>. The group trades at an average trailing PE of <strong>${avgPE.toFixed(1)}x</strong>. ${top.item.name} scores highest on a combined valuation + momentum basis, while ${avoid.item.name} ranks lowest.`;
+
+  // Build scored card HTML
+  const cardsHTML = scored.map((s, i) => {
+    const { item, d, pct, pros, cons, flags, verdict } = s;
+    const prosHTML  = pros.map(p  => `<li class="analysis-pro">✓ ${p}</li>`).join('');
+    const consHTML  = cons.map(c  => `<li class="analysis-con">✗ ${c}</li>`).join('');
+    const flagsHTML = flags.map(f => `<li class="analysis-flag">◆ ${f}</li>`).join('');
+    return `
+      <div class="score-card" style="--verdict-color:${verdict.color};--verdict-bg:${verdict.bg};">
+        <div class="score-card-top">
+          <div class="score-rank">#${i+1}</div>
+          <div class="score-identity">
+            <span class="score-name">${item.name}</span>
+            <span class="ticker-badge">${item.ticker}</span>
+          </div>
+          <div class="score-verdict" style="color:${verdict.color};background:${verdict.bg};border-color:${verdict.color}33;">
+            ${verdict.icon} ${verdict.label}
+          </div>
+          <div class="score-bar-wrap">
+            <div class="score-bar-track">
+              <div class="score-bar-fill" style="width:${pct}%;background:${verdict.color};"></div>
+            </div>
+            <span class="score-pct" style="color:${verdict.color};">${pct}/100</span>
+          </div>
+        </div>
+        <ul class="score-reasons">${prosHTML}${flagsHTML}${consHTML}</ul>
+      </div>`;
+  }).join('');
+
+  wrapper.innerHTML = `
+    <div class="analysis-card">
+      <h2>✦ Quantitative Analysis <span class="ai-badge">100% Free · No API Key</span></h2>
+      <div class="analysis-method-note">
+        Scores are calculated entirely from live market data using 6 criteria: PE ratio vs sector benchmark,
+        EPS strength, 1-month momentum, 3-month trend, 1-year return, and intraday context. No external AI or API required.
+      </div>
+
+      <div class="overview-block">
+        <div class="overview-label">Market Overview</div>
+        <div class="overview-text">${overviewText}</div>
+      </div>
+
+      <div class="top-picks">
+        <div class="pick-card pick-buy">
+          <div class="pick-label">⭐ Top Pick</div>
+          <div class="pick-name">${top.item.name} <span class="ticker-badge">${top.item.ticker}</span></div>
+          <div class="pick-reason">${top.pros[0] || 'Highest composite score across all criteria.'} Score: ${top.pct}/100.</div>
+        </div>
+        <div class="pick-card pick-watch">
+          <div class="pick-label">◆ Runner-up</div>
+          <div class="pick-name">${second.item.name} <span class="ticker-badge">${second.item.ticker}</span></div>
+          <div class="pick-reason">${second.pros[0] || 'Second-highest composite score.'} Score: ${second.pct}/100.</div>
+        </div>
+        <div class="pick-card pick-avoid">
+          <div class="pick-label">⚠ Most Caution</div>
+          <div class="pick-name">${avoid.item.name} <span class="ticker-badge">${avoid.item.ticker}</span></div>
+          <div class="pick-reason">${avoid.cons[0] || 'Lowest composite score in the group.'} Score: ${avoid.pct}/100.</div>
+        </div>
+      </div>
+
+      <div class="scores-label">Full Ranking — all 10 stocks scored</div>
+      <div class="scores-grid">${cardsHTML}</div>
+
+      <p class="disclaimer">Rule-based scoring using live market data only. This is not financial advice and does not account for qualitative factors, news, or future outlook. Always consult a qualified financial adviser before investing.</p>
+    </div>`;
+}
+
+async function loadAll() {
+  allLoaded=false; stockData={}; Object.values(charts).forEach(c=>c.destroy()); charts={};
+  const loadingEl=document.getElementById('loading-state'), gridEl=document.getElementById('stocks-grid');
+  const msgEl=document.getElementById('loading-msg'), subEl=document.getElementById('loading-sub');
+  const dotEl=document.getElementById('status-dot'), statusEl=document.getElementById('status-text');
+  const errEl=document.getElementById('error-banner');
+  const refreshBtn=document.getElementById('refresh-btn'), analysisBtn=document.getElementById('analysis-btn');
+  loadingEl.style.display=''; gridEl.style.display='none'; gridEl.innerHTML=''; errEl.style.display='none';
+  refreshBtn.disabled=true; analysisBtn.disabled=true;
+  dotEl.className='status-dot'; statusEl.textContent='Connecting to market data…';
+  let loadedCount=0;
+  for (let i=0;i<TOP10.length;i++) {
+    const item=TOP10[i];
+    msgEl.textContent=`Loading ${item.name}… (${i+1} / ${TOP10.length})`;
+    subEl.textContent=item.ticker;
+    try {
+      const data=await loadStock(item);
+      const card=renderCard(item,data,i);
+      gridEl.appendChild(card);
+      gridEl.style.display='grid';
+      if(i===TOP10.length-1) loadingEl.style.display='none';
+      setTimeout(()=>drawChart(item.ticker,data.closes),50);
+      loadedCount++;
+    } catch(e) {
+      console.error('Failed:',item.ticker,e);
+      if(loadedCount===0) {
+        loadingEl.style.display='none';
+        errEl.style.display='block';
+        errEl.innerHTML=`⚠ Could not load market data.<br><small style="font-family:monospace">${e.message}</small><br><br><small>Check that:<br>1. Your Netlify Functions are deployed (site → Functions tab should show <b>quote</b> and <b>fundamentals</b>)<br>2. Environment variables <b>FINNHUB_API_KEY</b> and <b>FMP_API_KEY</b> are set in Netlify → Site configuration → Environment variables<br>3. You redeployed after adding the environment variables</small>`;
+        refreshBtn.disabled=false; return;
+      }
+    }
+  }
+  loadingEl.style.display='none'; allLoaded=true;
+  refreshBtn.disabled=false; analysisBtn.disabled=false;
+  dotEl.className='status-dot live';
+  statusEl.textContent=`Live data · ${loadedCount} stocks loaded · Updated ${new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}`;
+  document.getElementById('timestamp').textContent=new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+}
+
+function setTab(tab,el) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active')); el.classList.add('active');
+  document.getElementById('tab-overview').style.display=tab==='overview'?'':'none';
+  document.getElementById('tab-analysis').style.display=tab==='analysis'?'':'none';
+  if(tab==='analysis'&&allLoaded) runAnalysis();
+}
+function switchToAnalysis() {
+  const tabs=document.querySelectorAll('.tab');
+  tabs.forEach(t=>t.classList.remove('active')); tabs[1].classList.add('active');
+  setTab('analysis',tabs[1]);
+}
+
+loadAll();
+</script>
+</body>
+</html>
