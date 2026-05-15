@@ -4,34 +4,33 @@ exports.handler = async (event) => {
     'Content-Type': 'application/json',
   };
 
-  const ticker = event.path.split('/').pop();
-  const FMP_KEY = process.env.FMP_API_KEY;
+  const ticker = event.path.split('/').pop().replace(/-/g, '.');
+  const FINNHUB_KEY = process.env.FINNHUB_API_KEY;
 
-  if (!FMP_KEY) {
-    return { statusCode: 500, headers, body: JSON.stringify({ error: 'FMP_API_KEY not set in Netlify environment variables' }) };
+  if (!FINNHUB_KEY) {
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'FINNHUB_API_KEY not set' }) };
   }
 
   try {
-    // Fetch key metrics and company profile in parallel
-    const [metricsRes, profileRes] = await Promise.all([
-      fetch(`https://financialmodelingprep.com/api/v3/key-metrics-ttm/${encodeURIComponent(ticker)}?apikey=${FMP_KEY}`),
-      fetch(`https://financialmodelingprep.com/api/v3/profile/${encodeURIComponent(ticker)}?apikey=${FMP_KEY}`)
+    const [metricRes, profileRes] = await Promise.all([
+      fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${encodeURIComponent(ticker)}&metric=all&token=${FINNHUB_KEY}`),
+      fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${encodeURIComponent(ticker)}&token=${FINNHUB_KEY}`)
     ]);
 
-    const metrics = await metricsRes.json();
-    const profile = await profileRes.json();
+    const metricData  = await metricRes.json();
+    const profileData = await profileRes.json();
 
-    const m = Array.isArray(metrics) ? metrics[0] : {};
-    const p = Array.isArray(profile) ? profile[0] : {};
+    const m = metricData?.metric || {};
+    const p = profileData || {};
 
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
-        mktCap:  p.mktCap          ?? null,
-        pe:      p.pe              ?? m.peRatioTTM ?? null,
-        eps:     m.netIncomePerShareTTM ?? null,
-        revenue: m.revenuePerShareTTM   ?? null,
+        mktCap:  p.marketCapitalization ? p.marketCapitalization * 1e6 : null,
+        pe:      m['peBasicExclExtraTTM']   ?? m['peTTM']      ?? null,
+        eps:     m['epsBasicExclExtraItemsTTM'] ?? m['epsTTM']  ?? null,
+        revenue: m['revenuePerShareTTM']    ?? null,
       })
     };
   } catch (e) {
