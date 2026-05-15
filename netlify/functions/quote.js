@@ -4,29 +4,32 @@ exports.handler = async (event) => {
     'Content-Type': 'application/json',
   };
 
-  const ticker = event.path.split('/').pop().replace(/-/g, '.');
+  const rawTicker = event.path.split('/').pop();
+  const ticker = rawTicker.replace(/-/g, '.');
   const FINNHUB_KEY = process.env.FINNHUB_API_KEY;
+  const AV_KEY = process.env.ALPHAVANTAGE_API_KEY;
 
-  if (!FINNHUB_KEY) {
-    return { statusCode: 500, headers, body: JSON.stringify({ error: 'FINNHUB_API_KEY not set' }) };
+  if (!FINNHUB_KEY || !AV_KEY) {
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'API keys not set' }) };
   }
 
   try {
-    const now   = Math.floor(Date.now() / 1000);
-    const from  = now - (400 * 24 * 60 * 60); // 400 days back for safety
-
-    const [quoteRes, candleRes] = await Promise.all([
+    // Fetch live quote from Finnhub and weekly history from Alpha Vantage in parallel
+    const avTicker = rawTicker.replace(/-/g, '.');
+    const [quoteRes, histRes] = await Promise.all([
       fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(ticker)}&token=${FINNHUB_KEY}`),
-      fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${encodeURIComponent(ticker)}&resolution=W&from=${from}&to=${now}&token=${FINNHUB_KEY}`)
+      fetch(`https://www.alphavantage.co/query?function=TIME_SERIES_WEEKLY&symbol=${encodeURIComponent(avTicker)}&apikey=${AV_KEY}`)
     ]);
 
-    const quote  = await quoteRes.json();
-    const candle = await candleRes.json();
+    const quote   = await quoteRes.json();
+    const histData = await histRes.json();
 
-    // Log for debugging
-    console.log('Candle status:', candle.s, 'Count:', candle.c?.length);
-
-    const closes = (candle.s === 'ok' && Array.isArray(candle.c)) ? candle.c : [];
+    // Extract closing prices from Alpha Vantage weekly data (most recent 52 weeks)
+    const weekly = histData['Weekly Time Series'] || {};
+    const closes = Object.entries(weekly)
+      .sort(([a], [b]) => new Date(a) - new Date(b))
+      .slice(-52)
+      .map(([, v]) => parseFloat(v['4. close']));
 
     return {
       statusCode: 200,
